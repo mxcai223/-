@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地牢勇者：共鬥暗黑詞魔</title>
+    <!-- Tailwind CSS for modern responsive visual layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for crisp RPG icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Noto Sans Traditional Chinese -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            user-select: none;
+            background-color: #090d16;
+            color: #f1f5f9;
+            touch-action: manipulation;
+        }
+
+        /* Screen Shake Animation */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            15% { transform: translate(-10px, -5px) rotate(-1.5deg); }
+            30% { transform: translate(10px, 5px) rotate(1.5deg); }
+            45% { transform: translate(-8px, 3px) rotate(-1deg); }
+            60% { transform: translate(8px, -3px) rotate(1deg); }
+            75% { transform: translate(-4px, -1px) rotate(0deg); }
+        }
+        .animate-shake {
+            animation: shake 0.45s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Visual Flash Feedback */
+        @keyframes flashGreen {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.8); }
+            50% { box-shadow: 0 0 45px 15px rgba(34, 197, 94, 0.85); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .flash-correct {
+            animation: flashGreen 0.5s ease-out;
+            border-color: #22c55e !important;
+            background-color: rgba(34, 197, 94, 0.2) !important;
+        }
+
+        @keyframes flashRed {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8); }
+            50% { box-shadow: 0 0 45px 15px rgba(239, 68, 68, 0.85); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .flash-wrong {
+            animation: flashRed 0.5s ease-out;
+            border-color: #ef4444 !important;
+            background-color: rgba(239, 68, 68, 0.25) !important;
+        }
+
+        /* Floating Damage Text Animation */
+        @keyframes floatDamage {
+            0% { opacity: 1; transform: translateY(0) scale(0.8); }
+            40% { opacity: 1; transform: translateY(-30px) scale(1.25); }
+            100% { opacity: 0; transform: translateY(-60px) scale(1.4); }
+        }
+        .floating-damage {
+            position: absolute;
+            animation: floatDamage 0.85s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+            font-weight: 900;
+            pointer-events: none;
+            z-index: 50;
+            text-shadow: 0 3px 10px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.8);
+        }
+
+        /* RPG Dungeon Styling */
+        .dungeon-card {
+            background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+            border: 2px solid #334155;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+        }
+
+        .dungeon-btn {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 0 #0f172a;
+        }
+        .dungeon-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #0f172a;
+        }
+        .dungeon-btn:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #0f172a;
+        }
+
+        /* Skill Pulse Glow */
+        @keyframes skillPulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.85); }
+        }
+        .skill-ready {
+            animation: skillPulse 1.4s infinite;
+            border-color: #f59e0b !important;
+        }
+
+        canvas#fx-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 overflow-x-hidden select-none">
+
+    <!-- Top HUD Header -->
+    <header class="w-full max-w-4xl bg-slate-900/90 border-2 border-amber-500/50 rounded-2xl p-2.5 sm:p-3 mb-2 backdrop-blur shadow-2xl flex flex-wrap items-center justify-between gap-2 z-30">
+        <!-- Hero Identity & HP -->
+        <div class="flex items-center space-x-2.5">
+            <div class="relative">
+                <div class="w-11 h-11 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-amber-300 text-xl shadow-inner">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <span id="hero-lvl-badge" class="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 font-black text-[10px] px-1.5 py-0.2 rounded-full border border-slate-950">
+                    Lv.1
+                </span>
+            </div>
+            <div>
+                <div class="flex items-center gap-1.5">
+                    <span id="hero-name-display" class="font-black text-amber-300 text-xs sm:text-sm tracking-wide">
+                        詞語勇者
+                    </span>
+                    <span id="combo-badge" class="hidden bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full animate-bounce">
+                        0 連擊
+                    </span>
+                </div>
+                
+                <!-- Hearts HP -->
+                <div id="hp-container" class="flex space-x-1 text-red-500 text-xs mt-0.5">
+                    <i class="fa-solid fa-heart"></i>
+                    <i class="fa-solid fa-heart"></i>
+                    <i class="fa-solid fa-heart"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Indicator / Player Switcher -->
+        <div class="flex items-center bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 text-xs gap-2">
+            <span class="text-slate-400 font-bold">模式：</span>
+            <button id="mode-toggle-btn" onclick="toggleGameMode()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-2.5 py-0.5 rounded-lg transition text-[11px] flex items-center gap-1">
+                <i class="fa-solid fa-users"></i>
+                <span id="mode-text">全班共鬥</span>
+            </button>
+        </div>
+
+        <!-- Mana (MP) & XP Bar -->
+        <div class="flex-1 max-w-[130px] sm:max-w-[170px] flex flex-col space-y-1">
+            <div class="flex justify-between text-[10px] font-extrabold text-cyan-300 px-0.5">
+                <span>魔力 (MP)</span>
+                <span id="mp-text">0/100</span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full border border-slate-700 overflow-hidden p-0.5">
+                <div id="mp-bar" class="bg-gradient-to-r from-cyan-500 to-blue-400 h-full rounded-full transition-all duration-300" style="width: 0%;"></div>
+            </div>
+
+            <div class="flex justify-between text-[10px] font-extrabold text-emerald-300 px-0.5">
+                <span>經驗 (XP)</span>
+                <span id="xp-text">0/100</span>
+            </div>
+            <div class="w-full bg-slate-950 h-1.5 rounded-full border border-slate-700 overflow-hidden p-0.5">
+                <div id="xp-bar" class="bg-gradient-to-r from-emerald-500 to-teal-300 h-full rounded-full transition-all duration-300" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Scores & Actions -->
+        <div class="flex items-center gap-1.5">
+            <div class="bg-slate-950 px-2 py-1 rounded-xl border border-slate-800 text-center">
+                <div class="text-[9px] text-slate-400 font-bold">個人積分</div>
+                <div id="score-display" class="font-black text-amber-400 text-xs sm:text-sm">0</div>
+            </div>
+
+            <button onclick="openLexiconModal()" title="詞語寶典" class="bg-amber-600 hover:bg-amber-500 text-slate-950 p-2 rounded-xl font-black shadow border border-amber-300 transition flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9">
+                <i class="fa-solid fa-book-bookmark text-sm"></i>
+            </button>
+            <button id="btn-inventory" onclick="openInventoryModal()" title="勇者裝備" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-xl font-black shadow border border-indigo-400 transition flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 relative">
+                <i class="fa-solid fa-shield-halved text-amber-300 text-sm"></i>
+                <span id="equip-count" class="absolute -top-1 -right-1 bg-amber-400 text-slate-950 text-[9px] w-3.5 h-3.5 rounded-full font-black flex items-center justify-center border border-slate-900">0</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Workspace -->
+    <main id="game-container" class="w-full max-w-4xl flex-1 flex flex-col gap-2 relative">
+        
+        <!-- Battle Arena Container -->
+        <div class="dungeon-card rounded-2xl p-3 sm:p-4 relative overflow-hidden flex flex-col items-center justify-center min-h-[185px] sm:min-h-[210px] border-amber-500/30">
+            <!-- Dynamic FX Canvas Layer -->
+            <canvas id="fx-canvas"></canvas>
+            <div class="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-20"></div>
+
+            <!-- Boss Name / HP Bar -->
+            <div class="w-full max-w-lg flex flex-col items-center mb-1 z-10">
+                <div class="w-full flex justify-between items-center text-xs font-bold text-slate-300 mb-1 px-1">
+                    <span id="boss-title-name" class="text-amber-400 flex items-center gap-1.5 text-xs sm:text-sm">
+                        <i class="fa-solid fa-dragon text-rose-500"></i> 暗黑詞魔尊者
+                    </span>
+                    <span id="boss-hp-text" class="text-slate-300 font-mono text-xs">HP: 1000 / 1000</span>
+                </div>
+                <div class="w-full bg-slate-950 h-4 rounded-full border border-slate-700 p-0.5 shadow-inner overflow-hidden">
+                    <div id="boss-hp-bar" class="bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- Urgent Attack Countdown Bar -->
+            <div class="w-full max-w-lg bg-slate-950/70 h-1.5 rounded-full overflow-hidden my-1 z-10 border border-slate-800">
+                <div id="timer-bar" class="bg-cyan-400 h-full transition-all duration-100 ease-linear" style="width: 100%;"></div>
+            </div>
+
+            <!-- Boss Animated Avatar -->
+            <div class="relative z-10 my-1 sm:my-2 flex items-center justify-center">
+                <div id="boss-avatar" class="text-6xl sm:text-7xl text-rose-500 transition-transform duration-200 drop-shadow-[0_10px_10px_rgba(0,0,0,0.9)] hover:scale-105 cursor-pointer" onclick="shakeBoss()">
+                    <i id="boss-icon" class="fa-solid fa-spaghetti-monster-flying"></i>
+                </div>
+            </div>
+
+            <!-- Dynamic Floating Damage FX Layer -->
+            <div id="fx-layer" class="absolute inset-0 pointer-events-none flex items-center justify-center z-30"></div>
+        </div>
+
+        <!-- Active Hero Skills -->
+        <div class="w-full grid grid-cols-3 gap-2 z-10">
+            <button id="skill-double" onclick="useSkill('double')" class="dungeon-btn bg-slate-800/90 border border-slate-700 hover:border-amber-400 text-slate-200 p-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 transition">
+                <i class="fa-solid fa-bolt text-rose-400"></i>
+                <span>雙倍重擊 (30 MP)</span>
+            </button>
+            <button id="skill-hint" onclick="useSkill('hint')" class="dungeon-btn bg-slate-800/90 border border-slate-700 hover:border-amber-400 text-slate-200 p-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 transition">
+                <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                <span>智慧提示 (20 MP)</span>
+            </button>
+            <button id="skill-heal" onclick="useSkill('heal')" class="dungeon-btn bg-slate-800/90 border border-slate-700 hover:border-amber-400 text-slate-200 p-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 transition">
+                <i class="fa-solid fa-hand-holding-heart text-emerald-400"></i>
+                <span>聖光治癒 (50 MP)</span>
+            </button>
+        </div>
+
+        <!-- Question Card Display -->
+        <div class="dungeon-card rounded-2xl p-3.5 sm:p-4 border-2 border-indigo-500/40 relative">
+            <div class="flex items-center justify-between mb-2">
+                <span id="question-badge" class="text-xs font-bold text-amber-300 bg-amber-950/80 border border-amber-800 px-3 py-0.5 rounded-full flex items-center gap-1">
+                    <i class="fa-solid fa-scroll"></i> 句型填空
+                </span>
+                
+                <!-- Speech TTS Button -->
+                <button id="btn-read-question" onclick="speakCurrentQuestion()" class="bg-indigo-950/90 hover:bg-indigo-900 border border-indigo-700 text-indigo-200 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 transition active:scale-95 shadow">
+                    <i class="fa-solid fa-volume-high text-amber-400"></i>
+                    <span>朗讀題目</span>
+                </button>
+            </div>
+
+            <!-- Question Stem -->
+            <div id="question-text" class="text-base sm:text-lg font-bold leading-relaxed text-slate-100 min-h-[55px] flex items-center justify-center text-center px-1">
+                題目載入中...
+            </div>
+        </div>
+
+        <!-- 4 Multiple Choice Options -->
+        <div id="options-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 my-0.5">
+            <!-- Dynamic Buttons Generated Here -->
+        </div>
+
+        <!-- Class Co-op Room Leaderboard & NPC Helpers Panel -->
+        <div id="coop-panel" class="dungeon-card rounded-2xl p-3 border-emerald-500/30 flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-emerald-400 font-black flex items-center gap-1">
+                        <i class="fa-solid fa-users-rays"></i> 班級共鬥討伐隊
+                    </span>
+                    <span id="coop-team-combo" class="bg-rose-950 border border-rose-800 text-rose-300 font-bold px-2 py-0.5 rounded-full">
+                        全班連擊：0 Combo
+                    </span>
+                </div>
+                <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 text-[11px] font-bold">
+                    <input type="checkbox" id="npc-helper-toggle" onchange="toggleNPCHelper(this.checked)" checked class="rounded border-slate-700 text-indigo-600">
+                    <span>模擬班級小隊助手</span>
+                </label>
+            </div>
+
+            <!-- MVP Leaderboard Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                    <div class="text-[11px] text-slate-400 font-bold mb-1 flex justify-between">
+                        <span>🏆 班級傷害 MVP 排行榜</span>
+                        <span id="coop-player-count">在線：1 人</span>
+                    </div>
+                    <div id="leaderboard-list" class="space-y-1 max-h-[85px] overflow-y-auto pr-1">
+                        <!-- Dynamic Leaderboard Items -->
+                    </div>
+                </div>
+                <div>
+                    <div class="text-[11px] text-slate-400 font-bold mb-1">📜 實時戰報廣播</div>
+                    <div id="coop-log" class="space-y-1 max-h-[85px] overflow-y-auto text-[11px] text-slate-300 bg-slate-950/60 rounded-xl p-2 border border-slate-800/80">
+                        <div class="text-slate-500 italic">準備戰鬥，打倒暗黑詞魔尊者！</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full max-w-4xl mt-2 text-center text-[11px] text-slate-500 py-1">
+        小學三年級中文核心詞彙：力氣、同意、早晨、覺得、快活、最後、沮喪、於是
+    </footer>
+
+    <!-- Lexicon Modal (詞語寶典) -->
+    <div id="modal-lexicon" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-slate-900 border-2 border-amber-500/70 rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl relative max-h-[85vh] flex flex-col">
+            <button onclick="closeLexiconModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-lg sm:text-xl font-black text-amber-400 mb-3 flex items-center gap-2 border-b border-slate-800 pb-2.5">
+                <i class="fa-solid fa-book-open-reader"></i> 三年級詞語寶典溫習手冊
+            </h3>
+            
+            <div id="lexicon-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1">
+                <!-- Dynamic Content -->
+            </div>
+
+            <button onclick="closeLexiconModal()" class="w-full mt-3 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-2.5 rounded-xl transition shadow">
+                返回戰鬥
+            </button>
+        </div>
+    </div>
+
+    <!-- Inventory / Equipment Modal -->
+    <div id="modal-inventory" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-indigo-500/70 rounded-2xl max-w-md w-full p-5 shadow-2xl relative">
+            <button onclick="closeInventoryModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl p-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-lg font-bold text-amber-400 mb-3 flex items-center gap-2 border-b border-slate-800 pb-2.5">
+                <i class="fa-solid fa-toolbox"></i> 勇者寶庫與裝備
+            </h3>
+            
+            <div id="inventory-list" class="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                <p class="text-slate-400 text-xs text-center py-6">目前還沒有裝備，擊敗怪物開啟寶箱吧！</p>
+            </div>
+
+            <button onclick="closeInventoryModal()" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl transition shadow">
+                關閉裝備庫
+            </button>
+        </div>
+    </div>
+
+    <!-- Reward Chest Modal -->
+    <div id="modal-reward" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-amber-400 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center relative">
+            <div class="text-5xl text-amber-400 mb-2 animate-bounce">
+                <i class="fa-solid fa-box-open"></i>
+            </div>
+            <h3 class="text-xl font-black text-amber-300 mb-1">獲得傳奇裝備寶箱！</h3>
+            <p class="text-slate-300 text-xs mb-3">答對獲得寶物，大幅增強勇者戰力！</p>
+
+            <div id="reward-card" class="bg-slate-800 border-2 border-amber-500/50 rounded-xl p-3.5 mb-4 flex items-center space-x-3 text-left shadow-lg">
+                <div id="reward-icon" class="text-3xl text-amber-400 bg-amber-950/60 p-2.5 rounded-lg border border-amber-500/40">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                    <h4 id="reward-title" class="font-bold text-amber-300 text-sm">智慧法杖</h4>
+                    <p id="reward-desc" class="text-xs text-slate-300 mt-0.5">答對得分 +20%</p>
+                </div>
+            </div>
+
+            <button onclick="claimReward()" class="w-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black py-2.5 rounded-xl shadow-lg transition text-sm">
+                收下裝備並繼續戰鬥
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="modal-gameover" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-red-500/80 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center">
+            <div class="text-5xl text-red-500 mb-2">
+                <i class="fa-solid fa-skull-crossbones"></i>
+            </div>
+            <h3 class="text-xl font-black text-red-400 mb-1">勇者體力耗盡！</h3>
+            <p class="text-slate-300 text-xs mb-4">別沮喪，溫習詞語後重新挑戰！</p>
+            
+            <div class="bg-slate-800 rounded-xl p-3 mb-4 border border-slate-700 text-left space-y-1.5 text-xs">
+                <div class="flex justify-between text-slate-300">
+                    <span>最終得分：</span>
+                    <span id="go-score" class="font-bold text-emerald-400">0</span>
+                </div>
+                <div class="flex justify-between text-slate-300">
+                    <span>累計答對：</span>
+                    <span id="go-correct" class="font-bold text-amber-300">0 題</span>
+                </div>
+                <div class="flex justify-between text-slate-300">
+                    <span>最高連擊：</span>
+                    <span id="go-streak" class="font-bold text-rose-400">0 Combo</span>
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-xl transition shadow-lg text-sm">
+                <i class="fa-solid fa-rotate-right mr-1"></i> 重整旗鼓再戰
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ----------------------------------------------------
+           1. Target Vocabulary Database & Detailed Templates
+        ---------------------------------------------------- */
+        const TARGET_WORDS = ['力氣', '同意', '早晨', '覺得', '快活', '最後', '沮喪', '於是'];
+
+        const DISTRACTOR_POOL = ['力量', '決定', '早上', '明白', '快樂', '開始', '難過', '突然', '討論', '希望', '認真', '緊張', '發現', '開心'];
+
+        const WORD_DATA = {
+            '力氣': {
+                pinyin: 'lì qi',
+                definition: '指人的體力或肌肉產生的力量。',
+                fillIns: [
+                    "哥哥用盡全身的（＿＿），終於搬開了擋在路中間的大石頭。",
+                    "經過一整天的特別體能訓練，他現在一點（＿＿）也沒有了。",
+                    "這隻小熊貓的（＿＿）真大，竟然能拉動這麼沉重的木箱。"
+                ],
+                synonyms: ['體力', '力量'],
+                usageCorrect: "大衛費了很大的力氣才把木門推開。"
+            },
+            '同意': {
+                pinyin: 'tóng yì',
+                definition: '贊成、接受別人的意見或要求。',
+                fillIns: [
+                    "經過熱烈的討論，爸爸終於（＿＿）帶我們去海洋公園玩。",
+                    "老師（＿＿）了我們的建議，決定舉辦一場班級同樂會。",
+                    "如果大家都（＿＿）這個方案，我們明天就開始實施。"
+                ],
+                synonyms: ['贊成', '應允'],
+                usageCorrect: "媽媽同意讓我週末和同學去圖書館看書。"
+            },
+            '早晨': {
+                pinyin: 'zǎo chén',
+                definition: '指日出後的一段時間，清晨。',
+                fillIns: [
+                    "太陽升起，新鮮的空氣讓（＿＿）的花園變得分外美麗。",
+                    "小鳥在（＿＿）的樹梢上歡快地歌唱，迎接新的一天。",
+                    "爺爺每天（＿＿）都會去公園散步和做體操。"
+                ],
+                synonyms: ['清晨', '早上'],
+                usageCorrect: "清晨的早晨涼風習習，令人精神振奮。"
+            },
+            '覺得': {
+                pinyin: 'jué de',
+                definition: '產生某種感覺或看法。',
+                fillIns: [
+                    "聽到這個好消息，大家都（＿＿）非常高興和激動。",
+                    "天氣漸漸變冷了，我（＿＿）需要多穿一件厚外套。",
+                    "看了這部感人的電影，小華（＿＿）受益匪淺。"
+                ],
+                synonyms: ['感到', '認為'],
+                usageCorrect: "聽完老師的講解，我覺得這道難題簡單多了。"
+            },
+            '快活': {
+                pinyin: 'kuài huo',
+                definition: '愉快、快樂、心情舒暢。',
+                fillIns: [
+                    "小魚在清澈的小溪裡自由自在、（＿＿）地游來游去。",
+                    "放假時，孩子們在綠油油的草地上（＿＿）地奔跑遊戲。",
+                    "小鳥在森林裡唱著（＿＿）的歌曲。"
+                ],
+                synonyms: ['快樂', '歡快'],
+                usageCorrect: "小狗在草地上快活地追逐著滾動的彩球。"
+            },
+            '最後': {
+                pinyin: 'zuì hòu',
+                definition: '時間或順序上的末尾、最終。',
+                fillIns: [
+                    "經過堅持不懈的努力，他（＿＿）贏得了跑步比賽的冠軍。",
+                    "讀完這本故事書的（＿＿）一頁，小華滿意地合上了書。",
+                    "我們（＿＿）決定在這個週末一起去攀登郊山。"
+                ],
+                synonyms: ['最終', '末尾'],
+                usageCorrect: "經過多次嘗試，我們最後解決了這個技術難題。"
+            },
+            '沮喪': {
+                pinyin: 'jǔ sàng',
+                definition: '灰心喪氣、情緒低落。',
+                fillIns: [
+                    "雖然這次考試成績不理想，但他沒有（＿＿），反而更加努力。",
+                    "看到自己精心搭好的積木城堡倒塌了，弟弟流露出（＿＿）的神情。",
+                    "別（＿＿），只要堅持下去，你下次一定能做好！"
+                ],
+                synonyms: ['灰心', '失意'],
+                usageCorrect: "遭遇失敗後，他雖然有些沮喪，但很快重拾信心。"
+            },
+            '於是': {
+                pinyin: 'yú shì',
+                definition: '連詞。表示後文是前文的結果，因此。',
+                fillIns: [
+                    "外面突然下起了大雨，（＿＿）我們決定取消原定的野餐計劃。",
+                    "弟弟找不到自己的玩具車，（＿＿）跑去向媽媽求助。",
+                    "天色漸漸暗了下來，（＿＿）大家各自轉身回家。"
+                ],
+                synonyms: ['因此', '結果'],
+                usageCorrect: "小明發現門鎖上了，於是敲門請爸爸開門。"
+            }
+        };
+
+        const EQUIPMENT_POOL = [
+            { name: "智慧之劍", icon: "fa-sword", desc: "答對得分額外 +20%", effect: "scoreBonus" },
+            { name: "勇者護盾", icon: "fa-shield", desc: "抵擋一次答錯扣血", effect: "shield" },
+            { name: "知識魔帽", icon: "fa-hat-wizard", desc: "答對獲得雙倍經驗 (XP)", effect: "xpBonus" },
+            { name: "幸運草胸針", icon: "fa-clover", desc: "答對額外恢復 +10 MP", effect: "mpBonus" }
+        ];
+
+        /* ----------------------------------------------------
+           2. State Variables
+        ---------------------------------------------------- */
+        let gameMode = 'coop'; // 'solo' or 'coop'
+        let playerId = 'player_' + Math.floor(Math.random() * 10000);
+        let playerName = '勇者' + playerId.slice(-3);
+
+        let score = 0;
+        let hp = 3;
+        const maxHp = 3;
+        let mp = 0;
+        const maxMp = 100;
+        let heroLevel = 1;
+        let xp = 0;
+        const xpPerLevel = 100;
+
+        let bossMaxHp = 1000;
+        let bossCurrentHp = 1000;
+        let teamCombo = 0;
+
+        let streak = 0;
+        let maxStreak = 0;
+        let totalCorrect = 0;
+
+        let currentQuestion = null;
+        let inventory = [];
+        let activeShield = false;
+        let isDoubleDamageNext = false;
+
+        let timerInterval = null;
+        let timeLeft = 100;
+
+        // Simulated Co-op NPC Students Data
+        let enableNPCHelper = true;
+        let npcTimer = null;
+        const NPC_NAMES = ['小明', '小華', '美美', '阿豪', '家豪', '詠晴', '子軒'];
+        let coopLeaderboard = {}; // name -> damage
+
+        // BroadcastChannel for Multi-Tab Local Co-op Sync
+        let syncChannel = null;
+        try {
+            syncChannel = new BroadcastChannel('dungeon_vocab_channel');
+            syncChannel.onmessage = (event) => {
+                handleBroadcastMessage(event.data);
+            };
+        } catch(e) {}
+
+        /* ----------------------------------------------------
+           3. Web Audio & Speech TTS Engine
+        ---------------------------------------------------- */
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.25);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.setValueAtTime(100, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'skill') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(850, now + 0.2);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                }
+            } catch(e) {}
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const cleanText = text.replace(/（＿＿）/g, '空白').replace(/<[^>]*>?/gm, '');
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function speakCurrentQuestion() {
+            if (currentQuestion) {
+                speakText(currentQuestion.plainText);
+            }
+        }
+
+        /* ----------------------------------------------------
+           4. Canvas Particle FX Engine
+        ---------------------------------------------------- */
+        const canvas = document.getElementById('fx-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            if (canvas && canvas.parentElement) {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function createParticles(x, y, color, count = 20) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 7,
+                    vy: (Math.random() - 0.5) * 7 - 2,
+                    size: Math.random() * 5 + 3,
+                    color: color,
+                    alpha: 1,
+                    life: Math.random() * 18 + 18
+                });
+            }
+        }
+
+        function updateCanvasParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 1 / p.life;
+                
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+            requestAnimationFrame(updateCanvasParticles);
+        }
+
+        /* ----------------------------------------------------
+           5. Dynamic Question Generator Engine
+        ---------------------------------------------------- */
+        function generateQuestion() {
+            startTimer();
+            const targetWord = TARGET_WORDS[Math.floor(Math.random() * TARGET_WORDS.length)];
+            const wordObj = WORD_DATA[targetWord];
+
+            const qType = Math.floor(Math.random() * 3);
+            let questionText = "";
+            let plainText = "";
+            let correctAnswer = targetWord;
+            let options = [];
+            let badgeText = "";
+
+            if (qType === 0) {
+                badgeText = "句型填空";
+                const sentenceTemplate = wordObj.fillIns[Math.floor(Math.random() * wordObj.fillIns.length)];
+                questionText = sentenceTemplate.replace('（＿＿）', '「 <span class="text-amber-400 font-extrabold border-b-2 border-amber-400 px-2 py-0.5 mx-1">？</span> 」');
+                plainText = sentenceTemplate.replace('（＿＿）', targetWord);
+                options = getDistractors(targetWord, 3);
+            } else if (qType === 1) {
+                badgeText = "詞義理解";
+                questionText = `下列哪一個詞語的意思是：「<span class="text-amber-300">${wordObj.definition}</span>」？`;
+                plainText = `何者的意思是：${wordObj.definition}`;
+                options = getDistractors(targetWord, 3);
+            } else {
+                badgeText = "近義詞對應";
+                const syn = wordObj.synonyms[0] || '適當詞語';
+                questionText = `與「<span class="text-indigo-300 font-black">${syn}</span>」意思最接近的詞語是？`;
+                plainText = `與 ${syn} 意思最接近的詞語是`;
+                options = getDistractors(targetWord, 3);
+            }
+
+            options.push(correctAnswer);
+            options = shuffleArray(options);
+
+            currentQuestion = {
+                text: questionText,
+                plainText: plainText,
+                correct: correctAnswer,
+                options: options,
+                badge: badgeText,
+                targetWord: targetWord
+            };
+
+            renderQuestion();
+        }
+
+        function getDistractors(correctWord, count) {
+            const combined = [...TARGET_WORDS, ...DISTRACTOR_POOL].filter(w => w !== correctWord);
+            return shuffleArray([...combined]).slice(0, count);
+        }
+
+        function shuffleArray(arr) {
+            const copy = [...arr];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+        }
+
+        /* ----------------------------------------------------
+           6. Timer Countdown Bar Logic
+        ---------------------------------------------------- */
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 100;
+            const timerBar = document.getElementById('timer-bar');
+            if (timerBar) timerBar.style.width = '100%';
+
+            timerInterval = setInterval(() => {
+                timeLeft -= 1.8;
+                if (timerBar) timerBar.style.width = `${Math.max(0, timeLeft)}%`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 200);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function handleTimeOut() {
+            spawnFloatingText("時間到！", "text-rose-500");
+            playSound('wrong');
+            
+            if (activeShield) {
+                activeShield = false;
+                spawnFloatingText("護盾抵擋傷害！", "text-cyan-400");
+                removeEquipEffect('shield');
+            } else {
+                hp--;
+            }
+            
+            streak = 0;
+            teamCombo = 0;
+            updateHUD();
+
+            if (hp <= 0) {
+                gameOver();
+            } else {
+                generateQuestion();
+            }
+        }
+
+        /* ----------------------------------------------------
+           7. Render UI
+        ---------------------------------------------------- */
+        function renderQuestion() {
+            document.getElementById('question-badge').innerHTML = `<i class="fa-solid fa-scroll"></i> ${currentQuestion.badge}`;
+            document.getElementById('question-text').innerHTML = currentQuestion.text;
+
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+
+            currentQuestion.options.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `dungeon-btn bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold border-2 border-slate-600 hover:border-amber-400 rounded-xl p-3 text-left text-sm sm:text-base flex items-center justify-between transition-all w-full`;
+                btn.onclick = () => handleAnswer(optText, btn);
+
+                const letter = String.fromCharCode(65 + idx);
+                btn.innerHTML = `
+                    <span class="flex items-center space-x-2.5">
+                        <span class="bg-slate-950 text-amber-400 border border-slate-700 w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs">
+                            ${letter}
+                        </span>
+                        <span>${optText}</span>
+                    </span>
+                    <button type="button" onclick="event.stopPropagation(); speakText('${optText}')" title="發音" class="text-slate-400 hover:text-amber-300 px-2 py-0.5">
+                        <i class="fa-solid fa-volume-low text-xs"></i>
+                    </button>
+                `;
+                grid.appendChild(btn);
+            });
+
+            updateSkillButtons();
+        }
+
+        function updateBossUI() {
+            const pct = Math.max(0, Math.min(100, (bossCurrentHp / bossMaxHp) * 100));
+            document.getElementById('boss-hp-bar').style.width = `${pct}%`;
+            document.getElementById('boss-hp-text').innerText = `HP: ${Math.max(0, Math.floor(bossCurrentHp))} / ${bossMaxHp}`;
+        }
+
+        function updateHUD() {
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('hero-name-display').innerText = playerName;
+
+            // Heart Icons
+            const hpContainer = document.getElementById('hp-container');
+            hpContainer.innerHTML = '';
+            for (let i = 0; i < maxHp; i++) {
+                if (i < hp) {
+                    hpContainer.innerHTML += `<i class="fa-solid fa-heart"></i>`;
+                } else {
+                    hpContainer.innerHTML += `<i class="fa-regular fa-heart text-slate-600"></i>`;
+                }
+            }
+
+            // MP Bar
+            document.getElementById('mp-bar').style.width = `${mp}%`;
+            document.getElementById('mp-text').innerText = `${mp}/${maxMp}`;
+
+            // XP Bar
+            document.getElementById('xp-bar').style.width = `${xp}%`;
+            document.getElementById('xp-text').innerText = `${xp}/${xpPerLevel}`;
+            document.getElementById('hero-lvl-badge').innerText = `Lv.${heroLevel}`;
+
+            // Combo Badges
+            const comboBadge = document.getElementById('combo-badge');
+            if (streak >= 2) {
+                comboBadge.innerText = `${streak} 連擊!`;
+                comboBadge.classList.remove('hidden');
+            } else {
+                comboBadge.classList.add('hidden');
+            }
+
+            document.getElementById('coop-team-combo').innerText = `全班連擊：${teamCombo} Combo`;
+            document.getElementById('equip-count').innerText = inventory.length;
+
+            updateSkillButtons();
+            updateLeaderboardUI();
+        }
+
+        function updateSkillButtons() {
+            document.getElementById('skill-double').disabled = (mp < 30);
+            document.getElementById('skill-hint').disabled = (mp < 20);
+            document.getElementById('skill-heal').disabled = (mp < 50);
+
+            if (mp >= 30) document.getElementById('skill-double').classList.add('skill-ready');
+            else document.getElementById('skill-double').classList.remove('skill-ready');
+
+            if (mp >= 20) document.getElementById('skill-hint').classList.add('skill-ready');
+            else document.getElementById('skill-hint').classList.remove('skill-ready');
+
+            if (mp >= 50) document.getElementById('skill-heal').classList.add('skill-ready');
+            else document.getElementById('skill-heal').classList.remove('skill-ready');
+        }
+
+        /* ----------------------------------------------------
+           8. Hero Skill Actions
+        ---------------------------------------------------- */
+        function useSkill(type) {
+            if (type === 'double' && mp >= 30) {
+                mp -= 30;
+                playSound('skill');
+                isDoubleDamageNext = true;
+                spawnFloatingText("雙倍爆擊準備！", "text-rose-400");
+            } else if (type === 'hint' && mp >= 20) {
+                mp -= 20;
+                playSound('skill');
+                const buttons = document.querySelectorAll('#options-grid button');
+                let removed = 0;
+                buttons.forEach(btn => {
+                    if (removed < 2 && !btn.innerText.includes(currentQuestion.correct)) {
+                        btn.style.opacity = '0.2';
+                        btn.disabled = true;
+                        removed++;
+                    }
+                });
+                spawnFloatingText("消去兩個錯誤！", "text-amber-300");
+            } else if (type === 'heal' && mp >= 50) {
+                if (hp < maxHp) {
+                    mp -= 50;
+                    hp++;
+                    playSound('skill');
+                    spawnFloatingText("聖光治癒 +1 心", "text-emerald-400");
+                } else {
+                    spawnFloatingText("體力已滿！", "text-slate-300");
+                }
+            }
+            updateHUD();
+        }
+
+        /* ----------------------------------------------------
+           9. Answer Evaluation Logic
+        ---------------------------------------------------- */
+        function handleAnswer(selectedText, btnEl) {
+            stopTimer();
+
+            const allBtns = document.querySelectorAll('#options-grid button');
+            allBtns.forEach(b => b.disabled = true);
+
+            const isCorrect = (selectedText === currentQuestion.correct);
+
+            if (isCorrect) {
+                playSound('correct');
+                btnEl.classList.add('flash-correct');
+
+                createParticles(canvas.width / 2, canvas.height / 2, '#22c55e', 25);
+
+                // Gains Calculation
+                let gainedScore = 100 + (streak * 10);
+                if (hasEquip('scoreBonus')) gainedScore = Math.floor(gainedScore * 1.2);
+                score += gainedScore;
+
+                let gainedXp = 25;
+                if (hasEquip('xpBonus')) gainedXp *= 2;
+                xp += gainedXp;
+                if (xp >= xpPerLevel) {
+                    heroLevel++;
+                    xp -= xpPerLevel;
+                    spawnFloatingText("等級提升 Lv." + heroLevel + "!", "text-amber-300");
+                }
+
+                let gainedMp = 20;
+                if (hasEquip('mpBonus')) gainedMp += 10;
+                mp = Math.min(maxMp, mp + gainedMp);
+
+                totalCorrect++;
+                streak++;
+                teamCombo++;
+                if (streak > maxStreak) maxStreak = streak;
+
+                // Boss Damage
+                let dmg = 45;
+                if (isDoubleDamageNext) {
+                    dmg *= 2;
+                    isDoubleDamageNext = false;
+                    spawnFloatingText(`爆擊 -${dmg}!`, "text-amber-400");
+                } else {
+                    spawnFloatingText(`擊中 -${dmg}!`, "text-emerald-400");
+                }
+
+                applyDamageToBoss(dmg, playerName);
+
+                // Hit Animation
+                const bAvatar = document.getElementById('boss-avatar');
+                bAvatar.classList.add('scale-75', 'brightness-200');
+                setTimeout(() => bAvatar.classList.remove('scale-75', 'brightness-200'), 200);
+
+                updateHUD();
+
+                setTimeout(() => {
+                    if (bossCurrentHp <= 0) {
+                        defeatBoss();
+                    } else {
+                        // 20% chance to open treasure chest on correct answer
+                        if (Math.random() < 0.25) {
+                            showRewardModal();
+                        } else {
+                            generateQuestion();
+                        }
+                    }
+                }, 750);
+
+            } else {
+                playSound('wrong');
+                btnEl.classList.add('flash-wrong');
+
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+                const gameContainer = document.getElementById('game-container');
+                gameContainer.classList.add('animate-shake');
+                setTimeout(() => gameContainer.classList.remove('animate-shake'), 500);
+
+                if (activeShield) {
+                    activeShield = false;
+                    spawnFloatingText("護盾抵擋扣血！", "text-cyan-400");
+                    removeEquipEffect('shield');
+                } else {
+                    hp--;
+                    spawnFloatingText("扣血！", "text-red-500");
+                }
+
+                streak = 0;
+                teamCombo = 0;
+                updateHUD();
+
+                allBtns.forEach(b => {
+                    if (b.innerText.includes(currentQuestion.correct)) {
+                        b.classList.add('border-emerald-500', 'bg-emerald-950/50');
+                    }
+                });
+
+                setTimeout(() => {
+                    if (hp <= 0) {
+                        gameOver();
+                    } else {
+                        generateQuestion();
+                    }
+                }, 1100);
+            }
+        }
+
+        function applyDamageToBoss(dmg, attackerName) {
+            bossCurrentHp = Math.max(0, bossCurrentHp - dmg);
+            coopLeaderboard[attackerName] = (coopLeaderboard[attackerName] || 0) + dmg;
+            
+            updateBossUI();
+            updateLeaderboardUI();
+            addCoopLog(`⚔️ ${attackerName} 答對詞語！對 Boss 造成 ${dmg} 點傷害`);
+
+            // Broadcast to sync with other browser tabs
+            if (syncChannel) {
+                syncChannel.postMessage({
+                    type: 'BOSS_DAMAGE',
+                    damage: dmg,
+                    attacker: attackerName,
+                    currentHp: bossCurrentHp,
+                    combo: teamCombo
+                });
+            }
+        }
+
+        function spawnFloatingText(text, colorClass) {
+            const layer = document.getElementById('fx-layer');
+            const el = document.createElement('div');
+            el.className = `floating-damage text-lg sm:text-2xl ${colorClass}`;
+            el.innerText = text;
+            layer.appendChild(el);
+            setTimeout(() => el.remove(), 850);
+        }
+
+        function shakeBoss() {
+            const bAvatar = document.getElementById('boss-avatar');
+            bAvatar.classList.add('animate-bounce');
+            setTimeout(() => bAvatar.classList.remove('animate-bounce'), 800);
+            speakCurrentQuestion();
+        }
+
+        /* ----------------------------------------------------
+           10. Class Co-op & Simulated NPC Helper Engine
+        ---------------------------------------------------- */
+        function toggleGameMode() {
+            if (gameMode === 'coop') {
+                gameMode = 'solo';
+                document.getElementById('mode-text').innerText = "單人冒險";
+                document.getElementById('coop-panel').classList.add('hidden');
+            } else {
+                gameMode = 'coop';
+                document.getElementById('mode-text').innerText = "全班共鬥";
+                document.getElementById('coop-panel').classList.remove('hidden');
+            }
+        }
+
+        function toggleNPCHelper(checked) {
+            enableNPCHelper = checked;
+            if (enableNPCHelper) {
+                startNPCHelperTimer();
+            } else {
+                clearInterval(npcTimer);
+            }
+        }
+
+        function startNPCHelperTimer() {
+            clearInterval(npcTimer);
+            npcTimer = setInterval(() => {
+                if (gameMode === 'coop' && enableNPCHelper && bossCurrentHp > 0) {
+                    const randomNpc = NPC_NAMES[Math.floor(Math.random() * NPC_NAMES.length)];
+                    const isSuccess = Math.random() > 0.3; // 70% success rate for classmates
+                    if (isSuccess) {
+                        const npcDmg = Math.floor(Math.random() * 20) + 20;
+                        teamCombo++;
+                        applyDamageToBoss(npcDmg, randomNpc);
+                    } else {
+                        teamCombo = 0;
+                        addCoopLog(`❌ ${randomNpc} 答錯題目，全班連擊數中斷！`);
+                    }
+                    updateHUD();
+                }
+            }, 3500);
+        }
+
+        function handleBroadcastMessage(data) {
+            if (data.type === 'BOSS_DAMAGE') {
+                bossCurrentHp = data.currentHp;
+                teamCombo = data.combo;
+                coopLeaderboard[data.attacker] = (coopLeaderboard[data.attacker] || 0) + data.damage;
+                updateBossUI();
+                updateHUD();
+                addCoopLog(`🌐 (聯機) ${data.attacker} 對 Boss 造成 ${data.damage} 點巨額傷害！`);
+            }
+        }
+
+        function addCoopLog(msg) {
+            const logBox = document.getElementById('coop-log');
+            if (logBox) {
+                const item = document.createElement('div');
+                item.className = "py-0.5 border-b border-slate-900/60";
+                item.innerText = msg;
+                logBox.prepend(item);
+                if (logBox.children.length > 15) logBox.removeChild(logBox.lastChild);
+            }
+        }
+
+        function updateLeaderboardUI() {
+            const listEl = document.getElementById('leaderboard-list');
+            if (!listEl) return;
+
+            // Sort top damage dealers
+            const sorted = Object.entries(coopLeaderboard).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            listEl.innerHTML = '';
+
+            if (sorted.length === 0) {
+                listEl.innerHTML = `<div class="text-slate-500 text-[11px]">暫無戰報記錄</div>`;
+                return;
+            }
+
+            sorted.forEach(([name, dmg], idx) => {
+                const isMe = (name === playerName);
+                listEl.innerHTML += `
+                    <div class="flex justify-between items-center bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800 ${isMe ? 'text-amber-300 font-bold border-amber-500/50' : 'text-slate-300'}">
+                        <span>${idx + 1}. ${name} ${isMe ? '(你)' : ''}</span>
+                        <span class="font-mono text-emerald-400 font-bold">${dmg} HP</span>
+                    </div>
+                `;
+            });
+        }
+
+        /* ----------------------------------------------------
+           11. Equipment & Reward Chest Modal Handlers
+        ---------------------------------------------------- */
+        function defeatBoss() {
+            playSound('correct');
+            document.getElementById('boss-icon').className = "fa-solid fa-skull text-slate-600";
+            alert(`🎉 恭喜勇者！全班成功擊敗「暗黑詞魔尊者」！\n你的得分為：${score}`);
+            
+            // Respawn Boss with higher health
+            bossMaxHp = Math.floor(bossMaxHp * 1.3);
+            bossCurrentHp = bossMaxHp;
+            document.getElementById('boss-icon').className = "fa-solid fa-spaghetti-monster-flying";
+            updateBossUI();
+            generateQuestion();
+        }
+
+        function showRewardModal() {
+            const item = EQUIPMENT_POOL[Math.floor(Math.random() * EQUIPMENT_POOL.length)];
+            
+            document.getElementById('reward-title').innerText = item.name;
+            document.getElementById('reward-desc').innerText = item.desc;
+            document.getElementById('reward-icon').innerHTML = `<i class="fa-solid ${item.icon}"></i>`;
+            
+            window.pendingReward = item;
+            document.getElementById('modal-reward').classList.remove('hidden');
+        }
+
+        function claimReward() {
+            if (window.pendingReward) {
+                inventory.push(window.pendingReward);
+                if (window.pendingReward.effect === 'shield') activeShield = true;
+                window.pendingReward = null;
+            }
+            document.getElementById('modal-reward').classList.add('hidden');
+            updateHUD();
+            generateQuestion();
+        }
+
+        function hasEquip(effect) {
+            return inventory.some(item => item.effect === effect);
+        }
+
+        function removeEquipEffect(effect) {
+            const idx = inventory.findIndex(item => item.effect === effect);
+            if (idx !== -1) inventory.splice(idx, 1);
+            updateHUD();
+        }
+
+        /* ----------------------------------------------------
+           12. Lexicon & Inventory Modals Logic
+        ---------------------------------------------------- */
+        function openLexiconModal() {
+            stopTimer();
+            const listEl = document.getElementById('lexicon-list');
+            listEl.innerHTML = '';
+
+            TARGET_WORDS.forEach(word => {
+                const info = WORD_DATA[word];
+                listEl.innerHTML += `
+                    <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-3 space-y-1">
+                        <div class="flex items-center justify-between border-b border-slate-700 pb-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-black text-amber-300 text-base sm:text-lg">${word}</span>
+                                <span class="text-xs text-slate-400 font-mono">(${info.pinyin})</span>
+                            </div>
+                            <button onclick="speakText('${word}，${info.definition}')" class="bg-indigo-950 hover:bg-indigo-900 border border-indigo-700 text-amber-300 text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-volume-high"></i> 發音
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-200"><strong>解釋：</strong>${info.definition}</p>
+                        <p class="text-xs text-slate-300"><strong>近義詞：</strong>${info.synonyms.join('、')}</p>
+                        <p class="text-xs text-amber-200/80 italic"><strong>例句：</strong>${info.usageCorrect}</p>
+                    </div>
+                `;
+            });
+
+            document.getElementById('modal-lexicon').classList.remove('hidden');
+        }
+
+        function closeLexiconModal() {
+            document.getElementById('modal-lexicon').classList.add('hidden');
+            startTimer();
+        }
+
+        function openInventoryModal() {
+            stopTimer();
+            const listEl = document.getElementById('inventory-list');
+            listEl.innerHTML = '';
+
+            if (inventory.length === 0) {
+                listEl.innerHTML = `<p class="text-slate-400 text-xs text-center py-6">目前還沒有裝備，擊敗怪物開啟寶箱吧！</p>`;
+            } else {
+                inventory.forEach(item => {
+                    listEl.innerHTML += `
+                        <div class="bg-slate-800 border border-slate-700 rounded-xl p-2.5 flex items-center space-x-3">
+                            <div class="text-xl text-amber-400 bg-amber-950/60 p-2 rounded-lg border border-amber-500/30">
+                                <i class="fa-solid ${item.icon}"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-amber-300 text-xs sm:text-sm">${item.name}</div>
+                                <div class="text-[11px] text-slate-300">${item.desc}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('modal-inventory').classList.remove('hidden');
+        }
+
+        function closeInventoryModal() {
+            document.getElementById('modal-inventory').classList.add('hidden');
+            startTimer();
+        }
+
+        /* ----------------------------------------------------
+           13. Game Over & Restart Engine
+        ---------------------------------------------------- */
+        function gameOver() {
+            stopTimer();
+            document.getElementById('go-score').innerText = score;
+            document.getElementById('go-correct').innerText = totalCorrect;
+            document.getElementById('go-streak').innerText = maxStreak;
+            document.getElementById('modal-gameover').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            score = 0;
+            hp = maxHp;
+            mp = 0;
+            xp = 0;
+            heroLevel = 1;
+            streak = 0;
+            maxStreak = 0;
+            totalCorrect = 0;
+            bossMaxHp = 1000;
+            bossCurrentHp = 1000;
+            teamCombo = 0;
+            inventory = [];
+            activeShield = false;
+            isDoubleDamageNext = false;
+
+            document.getElementById('modal-gameover').classList.add('hidden');
+
+            updateHUD();
+            updateBossUI();
+            generateQuestion();
+        }
+
+        /* ----------------------------------------------------
+           14. Initialization on Window Load
+        ---------------------------------------------------- */
+        window.onload = function() {
+            resizeCanvas();
+            requestAnimationFrame(updateCanvasParticles);
+            startNPCHelperTimer();
+            updateHUD();
+            updateBossUI();
+            generateQuestion();
+        };
+    </script>
+</body>
+</html>
